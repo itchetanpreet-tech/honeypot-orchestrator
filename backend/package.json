@@ -1,0 +1,14 @@
+{
+  "name": "honeypot-orchestrator-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Zero-dependency backend for the Honeypot Orchestrator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --experimental-sqlite --watch server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

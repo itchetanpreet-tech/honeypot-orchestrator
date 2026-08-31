@@ -1,0 +1,10 @@
+// server.js — Add ML integration
+import { classifyEventML, buildAttackChain } from './threatEngine.js';
+
+// In POST /api/events handler, replace classifyEvent with classifyEventML:
+// const { attack_type, confidence, severity, severity_score } = classifyEventRules(evt, recent);
+// Replace with:
+const { attack_type, confidence, severity, severity_score, source } = await classifyEventML(evt, recent);
+
+// Log if ML was used
+console.log(`[${source}] Event from ${source_ip}: ${attack_type} (${severity})`);

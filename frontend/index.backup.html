@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Honeypot Orchestrator — SOC Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --bg: #060a10;
+    --panel: #0d131c;
+    --panel-2: #121a26;
+    --line: #1c2633;
+    --text: #dbe4ee;
+    --text-dim: #6b7a8f;
+    --signal-crit: #ff3b5c;
+    --signal-high: #ffa733;
+    --signal-med: #ffd23f;
+    --signal-low: #39d98a;
+    --accent: #39d98a;
+    --accent-dim: #1b6b4f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  #root{min-height:100vh;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .app{max-width:1400px;margin:0 auto;padding:24px 28px 60px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:24px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{width:34px;height:34px;border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;position:relative;}
+  .brand-mark::after{content:'';position:absolute;inset:-4px;border:1px solid var(--accent-dim);animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.15;transform:scale(1);}50%{opacity:.55;transform:scale(1.06);}}
+  .brand h1{font-size:15px;margin:0;letter-spacing:.14em;text-transform:uppercase;font-weight:700;}
+  .brand p{margin:2px 0 0;font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
+  .live-pill{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--accent-dim);padding:6px 12px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .stat-card{background:var(--panel);border:1px solid var(--line);padding:18px 20px;position:relative;overflow:hidden;}
+  .stat-card .label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;}
+  .stat-card .value{font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:600;line-height:1;}
+  .stat-card.crit .value{color:var(--signal-crit);}
+  .stat-card.accent .value{color:var(--accent);}
+
+  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px;}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:18px 20px;}
+  .panel h2{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin:0 0 16px;font-weight:600;}
+
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .bar-row .name{width:130px;color:var(--text-dim);flex-shrink:0;}
+  .bar-track{flex:1;height:8px;background:var(--panel-2);position:relative;}
+  .bar-fill{height:100%;background:var(--accent);}
+  .bar-row .pct{width:40px;text-align:right;color:var(--text);}
+
+  .sev-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .sev-box{border:1px solid var(--line);padding:12px;text-align:center;}
+  .sev-box .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;}
+  .sev-box .l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);text-transform:uppercase;margin-top:4px;}
+  .sev-box.CRITICAL .n{color:var(--signal-crit);}
+  .sev-box.HIGH .n{color:var(--signal-high);}
+  .sev-box.MEDIUM .n{color:var(--signal-med);}
+  .sev-box.LOW .n{color:var(--signal-low);}
+
+  .feed{max-height:340px;overflow-y:auto;}
+  .feed::-webkit-scrollbar{width:6px;}
+  .feed::-webkit-scrollbar-thumb{background:var(--line);}
+  .feed-row{display:grid;grid-template-columns:14px 100px 1fr 90px 70px;gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .feed-row:hover{background:var(--panel-2);cursor:pointer;}
+  .sev-dot{width:8px;height:8px;border-radius:50%;}
+  .sev-dot.CRITICAL{background:var(--signal-crit);}
+  .sev-dot.HIGH{background:var(--signal-high);}
+  .sev-dot.MEDIUM{background:var(--signal-med);}
+  .sev-dot.LOW{background:var(--signal-low);}
+  .feed-ip{color:var(--text-dim);}
+  .feed-type{color:var(--text);}
+  .feed-time{color:var(--text-dim);text-align:right;}
+  .feed-score{text-align:right;}
+
+  .hp-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+  .hp-row:last-child{border-bottom:none;}
+  .hp-name{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;}
+  .hp-status{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:.08em;display:flex;align-items:center;gap:6px;}
+  .hp-attacks{font-family:'IBM Plex Mono',monospace;font-size:18px;color:var(--text-dim);}
+
+  .sessions{display:flex;flex-direction:column;gap:10px;}
+  .session-card{border:1px solid var(--line);padding:14px 16px;cursor:pointer;transition:border-color .15s;}
+  .session-card:hover{border-color:var(--accent-dim);}
+  .session-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .session-ip{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;}
+  .session-score{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:2px 8px;border:1px solid;}
+  .chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+  .chain-step{padding:3px 8px;background:var(--panel-2);border:1px solid var(--line);}
+  .chain-arrow{color:var(--text-dim);}
+  .chain-next{color:var(--accent);border-color:var(--accent-dim);}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(2,4,7,.75);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal{background:var(--panel);border:1px solid var(--line);max-width:640px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;}
+  .modal h3{font-family:'IBM Plex Mono',monospace;margin:0 0 16px;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);}
+  .modal pre{white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:var(--text);margin:0;}
+  .modal-close{float:right;background:none;border:1px solid var(--line);color:var(--text-dim);font-family:'IBM Plex Mono',monospace;cursor:pointer;padding:5px 10px;}
+
+  .empty{color:var(--text-dim);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:20px 0;text-align:center;}
+  @media(max-width:900px){.stat-row{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } = Recharts;
+
+const API = "/api";
+
+function useInterval(fn, ms) {
+  useEffect(() => {
+    fn();
+    const id = setInterval(fn, ms);
+    return () => clearInterval(id);
+  }, []);
+}
+
+function App() {
+  const [stats, setStats] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [honeypots, setHoneypots] = useState([]);
+  const [reportFor, setReportFor] = useState(null);
+  const [report, setReport] = useState(null);
+
+  const fetchAll = async () => {
+    try {
+      const [s, e, sess, hp] = await Promise.all([
+        fetch(`${API}/stats`).then(r => r.json()),
+        fetch(`${API}/events?limit=25`).then(r => r.json()),
+        fetch(`${API}/sessions`).then(r => r.json()),
+        fetch(`${API}/honeypots`).then(r => r.json()),
+      ]);
+      setStats(s); setEvents(e); setSessions(sess); setHoneypots(hp);
+    } catch (err) { console.error('fetch failed', err); }
+  };
+
+  useInterval(fetchAll, 3000);
+
+  const openReport = async (ip) => {
+    setReportFor(ip);
+    const r = await fetch(`${API}/report/${encodeURIComponent(ip)}`).then(r => r.json());
+    setReport(r);
+  };
+
+  const totalTypes = stats ? Object.values(stats.by_type).reduce((a,b)=>a+b,0) || 1 : 1;
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="brand">
+          <div className="brand-mark">H</div>
+          <div>
+            <h1>Honeypot Orchestrator</h1>
+            <p>AI Security Command Center</p>
+          </div>
+        </div>
+        <div className="live-pill"><span className="dot"></span>LIVE · POLLING 3S</div>
+      </div>
+
+      <div className="stat-row">
+        <div className="stat-card">
+          <div className="label">Active Honeypots</div>
+          <div className="value">{honeypots.filter(h=>h.status==='ACTIVE').length}/{honeypots.length}</div>
+        </div>
+        <div className="stat-card accent">
+          <div className="label">Total Events</div>
+          <div className="value">{stats ? stats.total_events : '—'}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Unique Attackers</div>
+          <div className="value">{stats ? stats.total_attackers : '—'}</div>
+        </div>
+        <div className="stat-card crit">
+          <div className="label">Critical Threats</div>
+          <div className="value">{stats ? stats.critical_threats : '—'}</div>
+        </div>
+      </div>
+
+      <div className="panel" style={{marginBottom:14}}>
+        <h2>Attack Activity (5-min buckets)</h2>
+        {stats && stats.timeline.length > 0 ? (
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={stats.timeline}>
+              <CartesianGrid stroke="#1c2633" strokeDasharray="3 3" />
+              <XAxis dataKey="time" stroke="#6b7a8f" fontSize={11} />
+              <YAxis stroke="#6b7a8f" fontSize={11} allowDecimals={false} />
+              <Tooltip contentStyle={{background:'#0d131c', border:'1px solid #1c2633', fontFamily:'IBM Plex Mono'}} />
+              <Line type="monotone" dataKey="count" stroke="#39d98a" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : <div className="empty">No events yet — run the simulator to generate activity.</div>}
+      </div>
+
+      <div className="grid-2">
+        <div className="panel">
+          <h2>Attack Types</h2>
+          {stats && Object.keys(stats.by_type).length > 0 ? Object.entries(stats.by_type)
+            .sort((a,b)=>b[1]-a[1])
+            .map(([type,count]) => (
+              <div className="bar-row" key={type}>
+                <div className="name">{type}</div>
+                <div className="bar-track"><div className="bar-fill" style={{width: `${(count/totalTypes*100).toFixed(0)}%`}}></div></div>
+                <div className="pct">{(count/totalTypes*100).toFixed(0)}%</div>
+              </div>
+            )) : <div className="empty">No data yet</div>}
+        </div>
+        <div className="panel">
+          <h2>Severity Breakdown</h2>
+          <div className="sev-grid">
+            {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => (
+              <div className={`sev-box ${sev}`} key={sev}>
+                <div className="n">{stats ? (stats.by_severity[sev]||0) : 0}</div>
+                <div className="l">{sev}</div>
+              </div>
+            ))}
+          </div>
+          <h2 style={{marginTop:20}}>Honeypots</h2>
+          {honeypots.map(hp => (
+            <div className="hp-row" key={hp.id}>
+              <div>
+                <div className="hp-name">{hp.id}</div>
+                <div className="hp-status"><span className="dot" style={{width:5,height:5}}></span>{hp.status}</div>
+              </div>
+              <div className="hp-attacks">{hp.attacks}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <div className="panel">
+          <h2>Live Attack Feed</h2>
+          <div className="feed">
+            {events.length === 0 && <div className="empty">Waiting for events…</div>}
+            {events.map(e => (
+              <div className="feed-row" key={e.id} onClick={()=>openReport(e.source_ip)}>
+                <span className={`sev-dot ${e.severity}`}></span>
+                <span className="feed-ip">{e.source_ip}</span>
+                <span className="feed-type">{e.attack_type}</span>
+                <span className="feed-time">{new Date(e.timestamp).toLocaleTimeString()}</span>
+                <span className="feed-score">{e.severity_score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="panel">
+          <h2>Attacker Sessions</h2>
+          <div className="sessions">
+            {sessions.length === 0 && <div className="empty">No sessions yet</div>}
+            {sessions.slice(0,6).map(s => (
+              <div className="session-card" key={s.source_ip} onClick={()=>openReport(s.source_ip)}>
+                <div className="session-top">
+                  <span className="session-ip">{s.source_ip}</span>
+                  <span className="session-score" style={{
+                    borderColor: s.max_severity_score>=76?'#ff3b5c':s.max_severity_score>=51?'#ffa733':s.max_severity_score>=26?'#ffd23f':'#39d98a',
+                    color: s.max_severity_score>=76?'#ff3b5c':s.max_severity_score>=51?'#ffa733':s.max_severity_score>=26?'#ffd23f':'#39d98a'
+                  }}>{s.max_severity_score}</span>
+                </div>
+                <div className="chain">
+                  {s.attack_chain.map((step,i) => (
+                    <React.Fragment key={i}>
+                      <span className="chain-step">{step}</span>
+                      {i < s.attack_chain.length-1 && <span className="chain-arrow">→</span>}
+                    </React.Fragment>
+                  ))}
+                  <span className="chain-arrow">→</span>
+                  <span className="chain-step chain-next">{s.likely_next_action}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {reportFor && (
+        <div className="modal-overlay" onClick={()=>{setReportFor(null);setReport(null);}}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <button className="modal-close" onClick={()=>{setReportFor(null);setReport(null);}}>CLOSE ✕</button>
+            <h3>Threat Intelligence Report — {reportFor}</h3>
+            {report ? <pre>{report.narrative}</pre> : <div className="empty">Generating…</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
