@@ -162,4 +162,4 @@ export function buildAttackChain(events) {
         chain: uniqueOrdered,
         likely_next: NEXT_STAGE[currentStage] || 'UNKNOWN',
     };
-}
+}                           
