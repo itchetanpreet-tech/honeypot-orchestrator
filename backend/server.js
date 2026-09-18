@@ -10,6 +10,9 @@ import { generateReport } from './reportGenerator.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
 
+// ML Server URL (port 5001 - Mac AirPlay uses 5000)
+const ML_SERVER_URL = process.env.ML_SERVER_URL || 'http://localhost:5001';
+
 // ML Integration - check if ML server is available
 let mlAvailable = false;
 let mlCheckDone = false;
@@ -17,7 +20,7 @@ let mlCheckDone = false;
 async function checkMLHealth() {
     if (mlCheckDone) return mlAvailable;
     try {
-        const response = await fetch('http://localhost:5000/health');
+        const response = await fetch(`${ML_SERVER_URL}/health`);
         mlAvailable = response.ok;
         mlCheckDone = true;
         console.log(`[ML] Server status: ${mlAvailable ? '✅ Available' : '❌ Unavailable'}`);
@@ -31,7 +34,7 @@ async function checkMLHealth() {
 
 async function classifyWithML(features) {
     try {
-        const response = await fetch('http://localhost:5000/predict', {
+        const response = await fetch(`${ML_SERVER_URL}/predict`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ features })
@@ -107,6 +110,19 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
+    // ✅ Serve Attacker Control Panel
+    if (req.method === 'GET' && (url.pathname === '/attacker' || url.pathname === '/attacker.html')) {
+        const htmlPath = path.join(__dirname, '..', 'frontend', 'attacker.html');
+        try {
+            const html = fs.readFileSync(htmlPath);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            return res.end(html);
+        } catch (err) {
+            console.error('Attacker panel not found:', htmlPath);
+            return send(res, 404, { error: 'Attacker panel not found' });
+        }
+    }
+
     // Serve the static frontend dashboard
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const htmlPath = path.join(__dirname, '..', 'frontend', 'index.html');
@@ -140,7 +156,6 @@ const server = http.createServer(async (req, res) => {
 
             let attack_type, confidence, severity, severity_score, source;
             if (mlResult && mlResult.attack_type) {
-                // Use ML result
                 const ruleResult = classifyEventRules(evt, recent);
                 attack_type = mlResult.attack_type;
                 confidence = mlResult.confidence;
@@ -149,7 +164,6 @@ const server = http.createServer(async (req, res) => {
                 source = 'ML';
                 console.log(`[ML] ${source_ip}: ${attack_type} (${severity})`);
             } else {
-                // Fallback to rules
                 const ruleResult = classifyEventRules(evt, recent);
                 attack_type = ruleResult.attack_type;
                 confidence = ruleResult.confidence;
@@ -247,6 +261,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
     console.log(`🛡️  Honeypot Orchestrator backend running at http://localhost:${PORT}`);
-    console.log(`   Dashboard:  http://localhost:${PORT}/`);
-    console.log(`   API:        http://localhost:${PORT}/api/events`);
+    console.log(`   Dashboard:       http://localhost:${PORT}/`);
+    console.log(`   Attacker Panel:  http://localhost:${PORT}/attacker`);
+    console.log(`   API:             http://localhost:${PORT}/api/events`);
+    console.log(`   ML Server:       ${ML_SERVER_URL}`);
 });
